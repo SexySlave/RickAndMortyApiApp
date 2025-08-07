@@ -6,6 +6,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
+import org.koin.core.module.dsl.factoryOf
 import org.sexyslave.app.features.characters.data.api.CharacterApi
 import org.sexyslave.app.features.characters.data.api.CharacterApiImpl
 import org.sexyslave.app.features.characters.mvi.CharactersViewModel
@@ -28,6 +29,7 @@ val appModule = module {
 //    viewModel { CharactersViewModel(get()) }
 
     // ИЛИ для мультиплатформы/Compose:
-    factory { CharactersViewModel(get()) }
+//    factory { CharactersViewModel(get()) }
+    factoryOf(::CharactersViewModel)
 
 }

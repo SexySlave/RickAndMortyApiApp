@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import cafe.adriel.voyager.navigator.Navigator
 import org.sexyslave.app.features.characters.ui.CharactersScreen
 
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -15,7 +16,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                Navigator(CharactersScreen())
+                Navigator(CharactersScreen)
             }
         }
     }
