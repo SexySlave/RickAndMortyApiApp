@@ -34,6 +34,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
+            implementation("androidx.compose.material:material:1.8.3") // Используйте последнюю стабильную версию
+
             implementation("androidx.compose.runtime:runtime-livedata:1.8.3")
 
             // Koin для Compose и Voyager
