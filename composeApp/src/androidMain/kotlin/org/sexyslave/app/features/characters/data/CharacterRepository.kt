@@ -29,9 +29,12 @@ sealed interface CacheRefreshState {
     object Success : CacheRefreshState
 }
 
+
 interface CharacterRepository {
-    fun getCharactersStream(): Flow<PagingData<Character>> // Для UI, читает из DAO
-    suspend fun getCharacterDetails(id: Int): Character     // Для деталей, кеш-first
+    fun getCharactersStream(): Flow<PagingData<Character>> // Нефильтрованный поток
+    fun getFilteredCharactersStream(filters: CharacterFilters): Flow<PagingData<Character>> // <--- НОВЫЙ МЕТОД
+
+    suspend fun getCharacterDetails(id: Int): Character
 
     val cacheRefreshState: StateFlow<CacheRefreshState>
     suspend fun refreshCharacterCache()
@@ -45,20 +48,33 @@ class CharacterRepositoryImpl(
 
     private val characterDao = database.characterDao()
 
-    // Состояние обновления кеша
     private val _cacheRefreshState = MutableStateFlow<CacheRefreshState>(CacheRefreshState.Idle)
     override val cacheRefreshState: StateFlow<CacheRefreshState> = _cacheRefreshState.asStateFlow()
 
-    // Этот Pager всегда читает из локальной базы данных.
-    // Он автоматически обновится, когда refreshCharacterCache() изменит данные в БД.
     override fun getCharactersStream(): Flow<PagingData<Character>> {
         return Pager(
-            config = PagingConfig(
-                pageSize = 20, // Не влияет на сеть, только на чтение из БД для UI
-                enablePlaceholders = false
-            ),
-
+            config = PagingConfig(pageSize = 20, enablePlaceholders = false),
             pagingSourceFactory = { characterDao.pagingSource() }
+        ).flow.map { pagingDataEntity ->
+            pagingDataEntity.map { characterEntity ->
+                characterEntity.toDomainModel()
+            }
+        }
+    }
+
+    // --- НОВАЯ РЕАЛИЗАЦЯ для фильтрованного потока ---
+    override fun getFilteredCharactersStream(filters: CharacterFilters): Flow<PagingData<Character>> {
+        return Pager(
+            config = PagingConfig(pageSize = 20, enablePlaceholders = false),
+            pagingSourceFactory = {
+                characterDao.getFilteredPagingSource(
+                    name = filters.name,
+                    status = filters.status?.apiValue, // Используем .apiValue
+                    species = filters.species,
+                    type = filters.type,
+                    gender = filters.gender?.apiValue  // Используем .apiValue
+                )
+            }
         ).flow.map { pagingDataEntity ->
             pagingDataEntity.map { characterEntity ->
                 characterEntity.toDomainModel()
@@ -119,7 +135,6 @@ class CharacterRepositoryImpl(
             if (cachedCharacter != null) {
                 cachedCharacter.toDomainModel()
             } else {
-                // Timber.d("Character $id not in cache, fetching from API")
                 val characterFromApi = characterApi.getCharacter(id)
                 characterDao.insertCharacter(characterFromApi.toEntity())
                 characterFromApi

@@ -1,4 +1,4 @@
-package org.sexyslave.app.db // или ваш выбранный пакет
+package org.sexyslave.app.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase

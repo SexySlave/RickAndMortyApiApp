@@ -28,4 +28,25 @@ interface CharacterDao {
 
     @Query("SELECT MAX(id) FROM characters")
     suspend fun getLastCharacterId(): Int?
+
+
+    @Query(
+        """
+        SELECT * FROM characters 
+        WHERE 
+            (:name IS NULL OR name LIKE '%' || :name || '%') AND
+            (:status IS NULL OR status = :status) AND
+            (:species IS NULL OR species LIKE '%' || :species || '%') AND
+            (:type IS NULL OR type LIKE '%' || :type || '%') AND
+            (:gender IS NULL OR gender = :gender)
+        ORDER BY id ASC 
+        """
+    )
+    fun getFilteredPagingSource(
+        name: String?,
+        status: String?,
+        species: String?,
+        type: String?,
+        gender: String?
+    ): PagingSource<Int, CharacterEntity>
 }

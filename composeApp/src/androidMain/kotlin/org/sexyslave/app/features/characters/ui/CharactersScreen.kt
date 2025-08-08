@@ -42,6 +42,10 @@ import coil.compose.AsyncImage
 import org.sexyslave.app.features.characters.data.api.Character
 import org.sexyslave.app.features.characters.mvi.CharactersViewModel
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -58,8 +62,8 @@ object CharactersScreen : Screen {
         val viewModel: CharactersViewModel = getScreenModel()
         val lazyCharacters: LazyPagingItems<Character> = viewModel.charactersFlow.collectAsLazyPagingItems()
         val cacheState by viewModel.cacheRefreshState.collectAsState()
+        val currentFilters by viewModel.currentFilters.collectAsState() // Собираем текущие фильтры
 
-        // isRefreshing теперь зависит от cacheState, а не от Paging LoadState
         val isActuallyRefreshing = cacheState is CacheRefreshState.Loading
         val pullRefreshState = rememberPullRefreshState(
             refreshing = isActuallyRefreshing,
@@ -80,7 +84,31 @@ object CharactersScreen : Screen {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                TopAppBar(title = { Text("Rick and Morty Characters") })
+                TopAppBar(
+                    title = { Text("Rick and Morty Characters") },
+                    actions = { // <--- СЕКЦИЯ ДЛЯ КНОПОК ДЕЙСТВИЙ
+                        IconButton(onClick = {
+                            // Навигация на экран фильтров:
+                            navigator.push(
+                                CharacterFiltersScreen(
+                                    initialFilters = currentFilters, // Передаем текущие фильтры
+                                    onApplyFilters = { newFilters ->
+                                        viewModel.applyFilters(newFilters)
+                                    },
+                                    onClearFilters = {
+                                        viewModel.clearFilters()
+                                    }
+                                )
+                            )
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.List,
+                                contentDescription = "Filter Characters",
+                                tint = if (currentFilters.isClear()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                )
             }
         ) { paddingValues ->
             Box(
@@ -89,23 +117,18 @@ object CharactersScreen : Screen {
                     .fillMaxSize()
                     .pullRefresh(pullRefreshState)
             ) {
-                // Основная логика отображения контента
                 when {
-                    // 1. Полноэкранный лоадер, если список от Paging пуст И кеш активно обновляется
                     lazyCharacters.itemCount == 0 && isActuallyRefreshing && lazyCharacters.loadState.refresh is LoadState.Loading -> {
-                        FullScreenLoading()
+                        FullScreenLoading(modifier = Modifier.align(Alignment.Center))
                     }
-                    // 2. Ошибка от Paging (если PagingSource из DAO вернул ошибку при первоначальной загрузке)
-                    // И при этом кеш не обновляется и не было ошибки обновления кеша (чтобы не перекрывать ошибку сети)
                     lazyCharacters.loadState.refresh is LoadState.Error && lazyCharacters.itemCount == 0 && !isActuallyRefreshing && cacheState !is CacheRefreshState.Error -> {
                         val error = lazyCharacters.loadState.refresh as LoadState.Error
                         ErrorState(
-
+                            modifier = Modifier.align(Alignment.Center),
                             message = "Error from local data: ${error.error.localizedMessage}",
                             onRetry = { lazyCharacters.retry() }
                         )
                     }
-                    // 3. Список персонажей (даже если пустой, LazyVerticalGrid справится)
                     else -> {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
@@ -115,7 +138,6 @@ object CharactersScreen : Screen {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             state = rememberLazyGridState()
                         ) {
-                            // Отображение элементов списка
                             if (lazyCharacters.itemCount > 0) {
                                 items(
                                     count = lazyCharacters.itemCount,
@@ -130,16 +152,13 @@ object CharactersScreen : Screen {
                                             }
                                         )
                                     } else {
-                                        // Плейсхолдер, если enablePlaceholders = true в PagingConfig
                                         CharacterItemPlaceholder()
                                     }
                                 }
                             }
 
-                            // Состояния загрузки и ошибок от Paging для APPEND (подгрузка следующих страниц из БД)
                             when (lazyCharacters.loadState.append) {
                                 is LoadState.Loading -> {
-                                    // span: { GridItemSpan(maxLineSpan) }
                                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                                         LoadingNextPageIndicator()
                                     }
@@ -156,21 +175,18 @@ object CharactersScreen : Screen {
                                 else -> {}
                             }
 
-                            // Состояния загрузки и ошибок от Paging для REFRESH (первоначальная загрузка из БД)
-                            // Это обрабатывается выше, но если itemCount > 0, можно показать маленькую ошибку здесь
                             if (lazyCharacters.loadState.refresh is LoadState.Error && lazyCharacters.itemCount > 0) {
                                 val e = lazyCharacters.loadState.refresh as LoadState.Error
                                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
-                                    ErrorStateSmall( // Используем маленькую ошибку, т.к. данные уже есть
+                                    ErrorStateSmall(
                                         message = "Refresh error: ${e.error.localizedMessage}",
-                                        onRetry = { lazyCharacters.refresh() } // Используем refresh() для Paging
+                                        onRetry = { lazyCharacters.refresh() }
                                     )
                                 }
                             }
 
-                            // Пустое состояние: если Paging не загружает, кеш не обновляется, ошибок нет, и itemCount == 0
                             if (lazyCharacters.loadState.refresh is LoadState.NotLoading &&
-                                lazyCharacters.loadState.append.endOfPaginationReached && // Убедимся, что Paging завершил все
+                                lazyCharacters.loadState.append.endOfPaginationReached &&
                                 lazyCharacters.itemCount == 0 &&
                                 !isActuallyRefreshing &&
                                 cacheState !is CacheRefreshState.Error
@@ -183,12 +199,10 @@ object CharactersScreen : Screen {
                     }
                 }
 
-                // PullRefreshIndicator всегда поверх
                 PullRefreshIndicator(
                     refreshing = isActuallyRefreshing,
                     state = pullRefreshState,
                     modifier = Modifier.align(Alignment.TopCenter)
-
                 )
             }
         }
@@ -235,23 +249,27 @@ fun CharacterItem(character: Character, onClick: () -> Unit) {
 
 @Composable
 fun CharacterItemPlaceholder() {
-    Card(modifier = Modifier.fillMaxWidth().aspectRatio(0.75f)) { // Соотношение сторон как у CharacterItem
-        Box(modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .aspectRatio(0.75f)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
     }
 }
 
 @Composable
-fun FullScreenLoading() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+fun FullScreenLoading(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(modifier = Modifier.size(64.dp))
     }
 }
 
 @Composable
 fun LoadingNextPageIndicator() {
-     Row(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
@@ -262,9 +280,9 @@ fun LoadingNextPageIndicator() {
 }
 
 @Composable
-fun ErrorState(message: String, onRetry: () -> Unit) {
+fun ErrorState(modifier: Modifier = Modifier, message: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
@@ -279,9 +297,9 @@ fun ErrorState(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-fun ErrorStateSmall(message: String, onRetry: () -> Unit) {
+fun ErrorStateSmall(modifier: Modifier = Modifier,message: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -295,8 +313,10 @@ fun ErrorStateSmall(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-fun EmptyState(message: String) {
-    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+fun EmptyState(modifier: Modifier = Modifier, message: String) {
+    Box(modifier = modifier
+        .fillMaxSize()
+        .padding(16.dp), contentAlignment = Alignment.Center) {
         Text(text = message, style = MaterialTheme.typography.headlineSmall)
     }
 }
