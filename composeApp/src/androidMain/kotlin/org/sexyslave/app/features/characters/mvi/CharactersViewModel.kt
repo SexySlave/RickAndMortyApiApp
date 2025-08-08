@@ -1,10 +1,5 @@
 package org.sexyslave.app.features.characters.mvi
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import cafe.adriel.voyager.core.model.ScreenModel
@@ -12,35 +7,42 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.sexyslave.app.features.characters.data.CharacterRepository
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.cachedIn
-import kotlinx.coroutines.CoroutineScope // <--- Импорт для CoroutineScope
-import kotlinx.coroutines.coroutineScope
 import org.sexyslave.app.features.characters.data.api.Character
-import org.sexyslave.app.features.characters.data.api.CharacterApi
-
-
-
-import androidx.paging.cachedIn // Убедитесь, что это androidx.paging.cachedIn
-import cafe.adriel.voyager.core.model.screenModelScope // Правильный scope для ScreenModel
-import org.sexyslave.app.features.characters.data.paging.CharactersPagingSource // <--- ВАЖНО: Добавьте этот импорт
-
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import org.sexyslave.app.features.characters.data.CacheRefreshState
 
 class CharactersViewModel(
-    private val characterApi: CharacterApi
+    private val characterRepository: CharacterRepository
 ) : ScreenModel {
 
-    val charactersFlow: Flow<PagingData<Character>> = Pager(
-        // Pager автоматически выведет Key (вероятно, Int) и Value (Character)
-        // из вашего CharactersPagingSource после того, как он будет распознан.
-        config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-        pagingSourceFactory = { CharactersPagingSource(characterApi) } // <--- Должен разрешиться после импорта
-    ).flow
-        .cachedIn(screenModelScope) // <--- Используйте screenModelScope
+    // Поток данных для UI, читает из локальной БД (DAO)
+    val charactersFlow: Flow<PagingData<Character>> =
+        characterRepository.getCharactersStream()
+            .cachedIn(screenModelScope) // кеширование PagingData в scope ViewModel
 
-    override fun onDispose() {
-        super.onDispose()
-        // Логика очистки, если необходима
+    // Состояние процесса обновления кеша
+    val cacheRefreshState: StateFlow<CacheRefreshState> = characterRepository.cacheRefreshState
+        .stateIn(
+            scope = screenModelScope,
+            started = SharingStarted.WhileSubscribed(5000), // Начинаем сбор, когда есть подписчики
+            initialValue = CacheRefreshState.Idle
+        )
+
+    init {
+        // Запускаем начальное обновление кеша при создании ViewModel,
+        // но только если оно еще не запущено или не было успешно завершено недавно.
+        refreshCache()
     }
+
+    fun refreshCache() {
+        // Проверяем, не идет ли уже загрузка, чтобы не запускать параллельно с UI
+        if (cacheRefreshState.value != CacheRefreshState.Loading) {
+            screenModelScope.launch {
+                characterRepository.refreshCharacterCache()
+            }
+        }
+    }
+
 }

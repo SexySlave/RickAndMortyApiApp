@@ -1,19 +1,24 @@
 package org.sexyslave.app.di
 
+
+import androidx.room.Room
 import org.koin.dsl.module
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
-import org.koin.androidx.viewmodel.dsl.viewModel // <--- ВАЖНО: Импорт для viewModel DSL
-import org.koin.core.module.dsl.factoryOf // Для ScreenModel
+import org.koin.android.ext.koin.androidApplication
+import org.koin.androidx.viewmodel.dsl.viewModel
+import org.sexyslave.app.db.AppDatabase
 import org.sexyslave.app.features.characters.data.CharacterRepository
 import org.sexyslave.app.features.characters.data.CharacterRepositoryImpl
 import org.sexyslave.app.features.characters.data.api.CharacterApi
 import org.sexyslave.app.features.characters.data.api.CharacterApiImpl
-import org.sexyslave.app.features.characters.mvi.CharacterDetailViewModel // <--- Импортируйте CharacterDetailViewModel
+import org.sexyslave.app.features.characters.mvi.CharacterDetailViewModel
 import org.sexyslave.app.features.characters.mvi.CharactersViewModel
+
+
 
 val appModule = module {
     // Сетевые зависимости
@@ -22,7 +27,7 @@ val appModule = module {
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
-                    // prettyPrint = true // удобно для отладки JSON ответов
+
                 })
             }
         }
@@ -30,18 +35,41 @@ val appModule = module {
     single<CharacterApi> { CharacterApiImpl(get()) }
 
     // Репозиторий
-    single<CharacterRepository> { CharacterRepositoryImpl(get()) } // <--- ДОБАВЛЕНО ОПРЕДЕЛЕНИЕ РЕПОЗИТОРИЯ
-
-    // ViewModel'и
-    // CharactersViewModel (это ScreenModel, поэтому используется factory или factoryOf)
-    factoryOf(::CharactersViewModel) // Если CharactersViewModel не принимает параметров, это ок.
-    // Если принимает characterApi, то factory { CharactersViewModel(get()) }
-
-    // CharacterDetailViewModel (это AndroidX ViewModel)
-    viewModel { (characterId: Int) -> // <--- ДОБАВЛЕНО ОПРЕДЕЛЕНИЕ ДЛЯ CharacterDetailViewModel
-        CharacterDetailViewModel(
-            characterRepository = get(), // Koin предоставит CharacterRepository
-            characterId = characterId      // characterId будет передан из parametersOf()
+    single<CharacterRepository> {
+        CharacterRepositoryImpl(
+            characterApi = get(),
+            database = get()
         )
     }
+
+    // CharactersViewModel
+     factory { CharactersViewModel(characterRepository = get()) }
+
+    // CharacterDetailViewModel
+    viewModel { (characterId: Int) ->
+        CharacterDetailViewModel(
+            characterRepository = get(),
+            characterId = characterId
+        )
+    }
+
+
+    single {
+        Room.databaseBuilder(
+            androidApplication(),
+            AppDatabase::class.java,
+            "rick_and_morty_db"
+        )
+            // .addMigrations(...)
+            .fallbackToDestructiveMigration()
+            .build()
+    }
+
+    single {
+        val database = get<AppDatabase>()
+        database.characterDao()
+    }
+
+
+
 }

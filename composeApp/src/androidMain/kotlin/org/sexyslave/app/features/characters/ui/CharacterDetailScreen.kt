@@ -22,13 +22,13 @@ import org.koin.core.parameter.parametersOf
 import org.sexyslave.app.features.characters.data.api.Character
 import org.sexyslave.app.features.characters.mvi.CharacterDetailUiState
 import org.sexyslave.app.features.characters.mvi.CharacterDetailViewModel
-import java.text.SimpleDateFormat
 import java.util.Locale
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 data class CharacterDetailScreen(val characterId: Int) : Screen {
 
+    @RequiresApi(Build.VERSION_CODES.O)
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -122,7 +122,7 @@ fun CharacterDetailsContent(character: Character) {
         item { DetailItem("Created:", formattedCreatedDate) }
         item { DetailItem("API URL:", character.url, isUrl = true) }
 
-        item { Spacer(modifier = Modifier.height(16.dp)) } // Отступ в конце
+        item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
 
@@ -137,13 +137,13 @@ fun DetailItem(label: String, value: String, isUrl: Boolean = false) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.weight(0.4f) // Метка занимает 40%
+            modifier = Modifier.weight(0.4f)
         )
         if (isUrl) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary, // Можно сделать кликабельной
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(0.6f)
             )
         } else {

@@ -1,3 +1,4 @@
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -18,52 +19,73 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     sourceSets {
-        androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
+        val commonMain by getting {
+            dependencies {
+                // Compose
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(compose.components.uiToolingPreview)
+
+                // Lifecycle
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+
+                // Дополнительные Compose зависимости
+                implementation("androidx.compose.material:material:1.8.3")
+                implementation("androidx.compose.runtime:runtime-livedata:1.8.3")
+
+                // Koin + Voyager
+                implementation("io.insert-koin:koin-android:4.1.0")
+                implementation("io.insert-koin:koin-androidx-compose:4.1.0")
+                implementation("cafe.adriel.voyager:voyager-koin:1.1.0-beta03")
+
+                // Ktor
+                implementation("io.ktor:ktor-client-core:3.2.3")
+                implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.2.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
+                // Gson (опционально для Room TypeConverters)
+                implementation("com.google.code.gson:gson:2.10.1")
+
+                // Paging (общая часть)
+                implementation("androidx.paging:paging-compose:3.3.6")
+
+                // Coil
+                implementation("io.coil-kt:coil-compose:2.7.0")
+
+                // Coroutines
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            }
         }
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
 
-            implementation("androidx.compose.material:material:1.8.3") // Используйте последнюю стабильную версию
+        val androidMain by getting {
+            dependencies {
+                implementation(compose.preview)
+                implementation(libs.androidx.activity.compose)
 
-            implementation("androidx.compose.runtime:runtime-livedata:1.8.3")
+                // Room (Android)
+                implementation("androidx.room:room-runtime:2.7.2")
+                implementation("androidx.room:room-ktx:2.7.2")
+                implementation("androidx.room:room-paging:2.7.2")
 
-            // Koin для Compose и Voyager
-            implementation("io.insert-koin:koin-android:4.1.0")
-            implementation("io.insert-koin:koin-androidx-compose:4.1.0")
-            implementation("cafe.adriel.voyager:voyager-koin:1.1.0-beta03") // Интеграция Koin с Voyager
+                // Ktor Android
+                implementation("io.ktor:ktor-client-cio:3.2.3")
 
-            // Сеть (Ktor)
-            implementation("io.ktor:ktor-client-core:3.2.3")
-            implementation("io.ktor:ktor-client-cio:3.2.3") // Android-движок для Ktor
-            implementation("io.ktor:ktor-client-content-negotiation:3.2.3")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:3.2.3")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-
-            // Кеширование (SQLDelight)
-            implementation("com.squareup.sqldelight:android-driver:1.5.5")
-            implementation("com.squareup.sqldelight:coroutines-extensions-jvm:1.5.5")
-
-            // Paging 3 (для пагинации)
-            implementation("androidx.paging:paging-compose:3.3.6")
-            implementation("androidx.paging:paging-runtime-ktx:3.3.6")
-
-            // Дополнительные библиотеки
-            implementation("io.coil-kt:coil-compose:2.7.0") // Загрузка изображений
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                // Paging runtime (Android)
+                implementation("androidx.paging:paging-runtime-ktx:3.3.6")
+            }
         }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+
+        val commonTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
         }
     }
 }
@@ -79,16 +101,19 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -97,5 +122,8 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
-}
 
+        // Здесь уже глобальный контекст DependencyHandler, тут доступен kspAndroid
+    add("kspAndroid", "androidx.room:room-compiler:2.7.2")
+
+}

@@ -7,16 +7,16 @@ import org.sexyslave.app.features.characters.data.api.CharacterApi
 
 class CharactersPagingSource(
     private val characterApi: CharacterApi
-) : PagingSource<Int, Character>() { // <--- Убедитесь, что типы Key (Int) и Value (Character) указаны
+) : PagingSource<Int, Character>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Character> {
         val page = params.key ?: 1 // Начальная страница
         return try {
-            val response = characterApi.getCharacters(page) // Предполагая, что ваш API метод принимает номер страницы
+            val response = characterApi.getCharacters(page)
             LoadResult.Page(
-                data = response.results, // Предполагая, что ваш API возвращает объект с полем results: List<Character>
+                data = response.results,
                 prevKey = if (page == 1) null else page - 1,
-                nextKey = if (response.results.isEmpty()) null else page + 1 // или используйте информацию о следующей странице из API
+                nextKey = if (response.results.isEmpty()) null else page + 1
             )
         } catch (e: Exception) {
             LoadResult.Error(e)

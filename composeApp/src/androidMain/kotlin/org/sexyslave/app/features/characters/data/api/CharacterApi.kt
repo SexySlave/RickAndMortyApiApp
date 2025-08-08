@@ -26,14 +26,14 @@ data class Character(
     val name: String,
     val status: String,
     val species: String,
-    val type: String, // Добавлено
+    val type: String,
     val gender: String,
-    val origin: Origin, // Обновлено/Добавлено
-    val location: Location, // Обновлено/Добавлено
+    val origin: Origin,
+    val location: Location,
     val image: String,
-    val episode: List<String>, // Добавлено
-    val url: String, // Добавлено
-    val created: String // Добавлено
+    val episode: List<String>,
+    val url: String,
+    val created: String
 )
 
 @Serializable
@@ -50,7 +50,7 @@ data class Location(
 
 interface CharacterApi {
     suspend fun getCharacters(page: Int): CharacterApiResponse
-    suspend fun getCharacter(id: Int): Character // Новый метод
+    suspend fun getCharacter(id: Int): Character
 }
 
 class CharacterApiImpl(private val client: HttpClient) : CharacterApi {
@@ -62,7 +62,7 @@ class CharacterApiImpl(private val client: HttpClient) : CharacterApi {
         }.body()
     }
 
-    override suspend fun getCharacter(id: Int): Character { // Реализация нового метода
+    override suspend fun getCharacter(id: Int): Character {
         return client.get("$baseUrl/$id").body()
     }
 }
